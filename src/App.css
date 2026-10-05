@@ -1,38 +1,361 @@
-.App {
-  text-align: center;
-}
+/* =========================
+   HOME PAGE
+========================= */
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
+.homePageWrapper {
   min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  position: relative;
+  overflow: hidden;
+
+  color: #ffffff;
+
+  background:
+    radial-gradient(
+      circle at 20% 20%,
+      rgba(72, 255, 154, 0.08),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 80% 80%,
+      rgba(74, 222, 128, 0.06),
+      transparent 30%
+    ),
+    #191a24;
+}
+
+
+/* =========================
+   MAIN CARD
+========================= */
+
+.formWrapper {
+  width: 430px;
+  max-width: calc(100% - 32px);
+
+  padding: 36px;
+
+  background: rgba(40, 42, 54, 0.92);
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+
+  box-shadow:
+    0 25px 60px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.02);
+
+  backdrop-filter: blur(12px);
+
+  animation: cardAppear 0.5s ease;
+}
+
+
+/* =========================
+   LOGO
+========================= */
+
+.logoContainer {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+
+.codesharelogo {
+  width: 150px;
+  height: auto;
+
+  object-fit: contain;
+
+  border-radius: 8px;
+
+  transition: transform 0.3s ease;
+}
+
+.codesharelogo:hover {
+  transform: scale(1.04);
+}
+
+
+/* =========================
+   HEADER
+========================= */
+
+.formHeader {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.formHeader h2 {
+  margin: 0 0 8px;
+
+  font-size: 25px;
+  font-weight: 700;
+
+  letter-spacing: -0.5px;
+}
+
+.formHeader p {
+  margin: 0;
+
+  color: #a9abb8;
+
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+
+/* =========================
+   INPUT GROUP
+========================= */
+
+.inputgroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.inputgroup label {
+  margin-bottom: 7px;
+
+  color: #d7d9e0;
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.inputbox {
+  width: 100%;
+  box-sizing: border-box;
+
+  padding: 13px 15px;
+  margin-bottom: 18px;
+
+  border: 1px solid #3a3d4c;
+  border-radius: 9px;
+
+  outline: none;
+
+  background: #20212c;
+  color: #ffffff;
+
+  font-size: 15px;
+  font-weight: 500;
+
+  transition:
+    border 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.inputbox::placeholder {
+  color: #777b8c;
+}
+
+.inputbox:hover {
+  border-color: #4a4d5d;
+}
+
+.inputbox:focus {
+  background: #22232e;
+
+  border-color: #4ade80;
+
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.12);
+}
+
+
+/* =========================
+   BUTTON
+========================= */
+
+.btn {
+  border: none;
+  outline: none;
+
+  padding: 13px 18px;
+
+  border-radius: 9px;
+
+  font-size: 15px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.joinbtn {
+  width: 100%;
+
+  margin-top: 4px;
+
+  background: #4ade80;
+  color: #102017;
+
+  box-shadow: 0 6px 18px rgba(74, 222, 128, 0.18);
+}
+
+.joinbtn:hover {
+  background: #22c55e;
+
+  transform: translateY(-2px);
+
+  box-shadow: 0 9px 24px rgba(74, 222, 128, 0.25);
+}
+
+.joinbtn:active {
+  transform: translateY(0);
+}
+
+
+/* =========================
+   DIVIDER
+========================= */
+
+.divider {
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  margin: 25px 0;
+
+  color: #656979;
+
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+
+  flex: 1;
+
+  height: 1px;
+
+  background: #383a47;
+}
+
+
+/* =========================
+   CREATE ROOM
+========================= */
+
+.createInfo {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+
+  gap: 7px;
+
+  color: #9699a8;
+
+  font-size: 13px;
 }
 
-.App-link {
-  color: #61dafb;
+.createNewBtn {
+  color: #4ade80;
+
+  font-size: 14px;
+  font-weight: 600;
+
+  text-decoration: none;
+
+  transition: color 0.2s ease;
 }
 
-@keyframes App-logo-spin {
+.createNewBtn:hover {
+  color: #86efac;
+  text-decoration: underline;
+}
+
+
+/* =========================
+   FOOTER
+========================= */
+
+footer {
+  position: absolute;
+
+  bottom: 22px;
+  left: 0;
+  right: 0;
+
+  text-align: center;
+}
+
+footer h4 {
+  margin: 0;
+
+  color: #858896;
+
+  font-size: 13px;
+  font-weight: 500;
+}
+
+footer a {
+  color: #4ade80;
+
+  font-weight: 600;
+
+  text-decoration: none;
+
+  transition: color 0.2s ease;
+}
+
+footer a:hover {
+  color: #86efac;
+  text-decoration: underline;
+}
+
+.heart {
+  font-size: 12px;
+}
+
+
+/* =========================
+   ANIMATION
+========================= */
+
+@keyframes cardAppear {
   from {
-    transform: rotate(0deg);
+    opacity: 0;
+    transform: translateY(15px) scale(0.98);
   }
+
   to {
-    transform: rotate(360deg);
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
+
+
+/* =========================
+   MOBILE
+========================= */
+
+@media (max-width: 500px) {
+  .formWrapper {
+    padding: 28px 22px;
+  }
+
+  .formHeader h2 {
+    font-size: 22px;
+  }
+
+  .codesharelogo {
+    width: 135px;
+  }
+
+  footer {
+    bottom: 15px;
+  }
+}
+
