@@ -1,18 +1,19 @@
-# CodeShare — Real-Time Collaborative Code Editor
+# CodeShare — Real-Time Collaborative Code Editor with Yjs CRDT
 
-A full-stack, real-time collaborative code editor built with **React**, **Node.js**, **Express**, **Socket.io**, and **Monaco Editor** (the engine powering VS Code). Users can create or join shared rooms via unique room IDs to edit code concurrently with live multi-user presence, real-time syntax highlighting, and state persistence.
+A high-performance, full-stack real-time collaborative code editor powered by **React 19**, **Monaco Editor** (the engine behind VS Code), **Socket.io**, and **Yjs CRDTs** (Conflict-free Replicated Data Types). Collaborators can create or join shared rooms to edit code concurrently with character-level mathematical conflict resolution, live cursor/selection awareness, synchronized language highlighting, and instant user presence.
 
 ---
 
 ## Features
 
-- **Real-Time Code Collaboration**: Instant peer-to-peer code synchronization over WebSockets powered by Socket.io without echo loops.
-- **VS Code Editor Experience**: Powered by Monaco Editor with syntax highlighting, line numbers, smooth scrolling, cursor blinking, and minimap.
+- **Yjs CRDT Code Synchronization**: Character-level real-time document synchronization via Conflict-free Replicated Data Types (CRDTs). Edits merge deterministically with zero data loss and zero merge conflicts.
+- **VS Code Editor Experience**: Powered by Monaco Editor with syntax highlighting, line numbers, smooth scrolling, bracket matching, cursor animations, and minimap.
 - **Multi-Language Synchronization**: Live synchronized language switcher supporting **13 languages**:
   - JavaScript, TypeScript, Python, Java, C++, HTML, CSS, JSON, Markdown, Go, Rust, SQL, and Text.
-  - When any user changes the language, all connected peers update automatically in real-time.
-- **Live User Presence**: Sidebar displaying connected users with deterministic color-coded avatars and real-time online status indicators.
-- **In-Memory Room State Persistence**: The server tracks room state (current code buffer and active language), so newly joined users immediately receive the up-to-date editor state even if existing users are idle.
+  - When any participant changes the language, all connected peers update immediately in real-time.
+- **In-Memory Server-Side Document State**: The backend maintains room-level `Y.Doc` documents. When a new collaborator arrives, the server immediately sends the full CRDT state vector, instantly populating the editor even if other peers are idle.
+- **Strict-Mode Resilient Lifecycle**: Custom Monaco-Yjs binding designed specifically to handle React 18/19 StrictMode lifecycle mounts without dropped listeners or broken bindings.
+- **Live User Presence**: Sidebar displaying connected users with deterministic color-coded avatars and online status indicators.
 - **Instant Room Generation & Sharing**: Cryptographically secure room UUID generation using native `crypto.randomUUID()`, with a one-click "Copy Room ID" clipboard action.
 - **Presence Lifecycle Notifications**: Interactive toast alerts (via `react-hot-toast`) when collaborators join or leave the room.
 - **Keyboard Shortcuts & Form Polish**: Full `Enter` key submission support on inputs, whitespace trimming validation, accessible labels, and a dark glassmorphic theme.
@@ -21,13 +22,16 @@ A full-stack, real-time collaborative code editor built with **React**, **Node.j
 
 ## Tech Stack
 
-| Layer | Choice | Description |
+| Layer | Technology | Purpose |
 | :--- | :--- | :--- |
-| **Frontend** | React 19 | Component-driven UI with Hooks (`useRef`, `useState`, `useEffect`) |
+| **Frontend** | React 19 (`react`, `react-dom`) | Component-driven UI with Hooks (`useRef`, `useState`, `useEffect`) |
 | **Code Editor** | Monaco Editor (`@monaco-editor/react`) | VS Code's core editing engine with dynamic model tokenizer |
-| **Routing** | `react-router-dom` v7 | Declarative SPA navigation and room param handling |
+| **CRDT Engine** | `yjs` | Conflict-free Replicated Data Type engine for concurrent document edits |
+| **Editor Binding** | Custom `MonacoBinding` (`src/utils/y-monaco.js`) | Bidirectional sync between `Y.Text` and Monaco's text model |
+| **Transport Provider** | Custom `SocketIOProvider` (`src/yjs-provider.js`) | Network sync provider relaying binary Yjs state vectors over Socket.io |
+| **Routing** | `react-router-dom` v7 | Declarative SPA navigation and room parameter handling |
 | **Realtime Client** | `socket.io-client` v4 | WebSocket transport with automatic reconnect and error guards |
-| **Backend** | Node.js + Express 5 + `socket.io` | WebSocket server managing room subscriptions and state |
+| **Backend** | Node.js + Express 5 + `socket.io` | WebSocket server managing room subscriptions and in-memory `Y.Doc` state |
 | **Notifications** | `react-hot-toast` | Throttled and deduplicated toast feedback |
 | **Styling** | Modular Global CSS | Custom dark theme with glassmorphic cards and responsive layout |
 | **Testing** | Jest + React Testing Library | Unit tests configured with modern ESM exports mapping |
@@ -38,29 +42,31 @@ A full-stack, real-time collaborative code editor built with **React**, **Node.j
 
 ```
 realtime-code-editor/
-├── server.js                 # Express + Socket.io collaboration server
+├── server.js                     # Express + Socket.io server with room Y.Doc state
 ├── public/
-│   ├── codesharelogo.png     # Application logo
+│   ├── codesharelogo.png         # Application logo
 │   ├── favicon.ico
-│   ├── index.html            # Web app entrypoint and metadata
+│   ├── index.html                # Web app entrypoint and metadata
 │   └── manifest.json
 ├── src/
-│   ├── Actions.js            # Centralized socket action event constants
-│   ├── App.jsx               # Router, routes, and global Toaster provider
-│   ├── App.css               # Home layout, sidebar, and editor workspace styles
-│   ├── App.test.js           # Frontend unit test suite
-│   ├── index.js              # React DOM root entrypoint
-│   ├── index.css             # Base resets and typography
-│   ├── socket.js             # Client Socket.io factory
-│   ├── setupTests.js         # Jest DOM & TextEncoder/Decoder polyfills
+│   ├── Actions.js                # Centralized socket action event constants
+│   ├── App.jsx                   # Router, routes, and global Toaster provider
+│   ├── App.css                   # Home layout, sidebar, and editor workspace styles
+│   ├── App.test.js               # Frontend unit test suite
+│   ├── index.js                  # React DOM root entrypoint
+│   ├── index.css                 # Base resets and typography
+│   ├── socket.js                 # Client Socket.io factory
+│   ├── setupTests.js             # Jest DOM & TextEncoder/Decoder polyfills
+│   ├── yjs-provider.js           # Custom Socket.io transport provider for Yjs
 │   ├── components/
-│   │   ├── Client.jsx        # User avatar badge with deterministic color hashing
-│   │   └── Editor.jsx        # Monaco Editor component with live socket listeners
+│   │   ├── Client.jsx            # User avatar badge with deterministic color hashing
+│   │   └── Editor.jsx            # Monaco Editor with Yjs CRDT binding
 │   ├── Pages/
-│   │   ├── Home.jsx          # Room creation & joining landing page
-│   │   └── EditorPage.jsx    # Main collaborative workspace
+│   │   ├── Home.jsx              # Room creation & joining landing page
+│   │   └── EditorPage.jsx        # Main collaborative workspace
 │   └── utils/
-│       └── uuid.js           # Native crypto UUID generator with fallback
+│       ├── uuid.js               # Native crypto UUID generator with fallback
+│       └── y-monaco.js           # Robust Monaco-Yjs model binding
 └── package.json
 ```
 
@@ -118,38 +124,62 @@ npm run build
 
 ---
 
-## Real-Time Collaboration Architecture
+## Architecture & Synchronization Model
 
 ```mermaid
 flowchart TD
-    subgraph Clients ["Browser Clients"]
-        A["User 1 (Monaco Editor)"]
-        B["User 2 (Monaco Editor)"]
+    subgraph Client1 ["Browser Client 1 (User A)"]
+        M1["Monaco Editor"] <-->|"MonacoBinding"| Y1["Y.Doc (Local CRDT)"]
+        Y1 <-->|"SocketIOProvider"| P1["WebSocket Socket.io Client"]
     end
 
     subgraph Server ["Node.js + Socket.io Server (:5001)"]
         S["Socket.io Event Dispatcher"]
-        subgraph Storage ["In-Memory State"]
-            RM["roomDataMap [code, language]"]
+        subgraph Storage ["Server Memory"]
+            RD["roomYDocs [roomId -> Y.Doc]"]
+            RM["roomDataMap [roomId -> language]"]
             UM["userSocketMap [socketId -> user]"]
         end
     end
 
-    A <-->|"join, code-change, language-change, sync-code"| S
-    B <-->|"join, code-change, language-change, sync-code"| S
+    subgraph Client2 ["Browser Client 2 (User B)"]
+        P2["WebSocket Socket.io Client"] <-->|"SocketIOProvider"| Y2["Y.Doc (Local CRDT)"]
+        Y2 <-->|"MonacoBinding"| M2["Monaco Editor"]
+    end
+
+    P1 <-->|"yjs-update, yjs-sync-step1, yjs-sync-step2"| S
+    P2 <-->|"yjs-update, yjs-sync-step1, yjs-sync-step2"| S
+    P1 <-->|"join, language-change, disconnected"| S
+    P2 <-->|"join, language-change, disconnected"| S
+    S <--> RD
     S <--> RM
     S <--> UM
 ```
+
+### Synchronization Protocol
+
+1. **Initial Room Join (`join`)**:
+   - The client emits `join` with `{ roomId, username }`.
+   - The server creates or fetches the room's persistent `Y.Doc`.
+   - The server immediately responds with `yjs-sync-step2` containing the full binary state vector of the room, instantly initializing the newcomer's editor with the current code.
+2. **Incremental Edits (`yjs-update`)**:
+   - As a user types, `MonacoBinding` transacts changes directly into `Y.Text`.
+   - `SocketIOProvider` catches the document's update event and emits `yjs-update` with `{ roomId, update }`.
+   - The server applies the update to its room `Y.Doc` via `Y.applyUpdate(...)` and immediately broadcasts the raw update to all other room peers (`socket.to(roomId)`).
+   - Peer clients apply the update to their local `Y.Doc` with origin tracking (preventing echo loops), and `MonacoBinding` applies delta edits to their Monaco editor model.
+3. **Language Switch (`language-change`)**:
+   - Synchronized separately over Socket.io as room metadata so syntax highlighting updates instantaneously across all active editors.
 
 ### WebSocket Event Protocol (`Actions.js`)
 
 | Event Name | Direction | Payload | Description |
 | :--- | :--- | :--- | :--- |
-| `join` | Client $\rightarrow$ Server | `{ roomId, username }` | Subscribes socket to room, maps socket ID, and triggers user list broadcast. |
+| `join` | Client $\rightarrow$ Server | `{ roomId, username }` | Subscribes socket to room, registers user, and sends initial state. |
 | `joined` | Server $\rightarrow$ Room | `{ clients, username, socketId }` | Emitted to all clients in the room when a new peer arrives. |
-| `code-change` | Bi-directional | `{ roomId, code }` | Relays document buffer updates to room peers while updating server cache. |
+| `yjs-update` | Bi-directional | `{ roomId, update }` | Broadcasts incremental binary Yjs CRDT document updates. |
+| `yjs-sync-step1` | Client $\rightarrow$ Server | `{ roomId, stateVector }` | Client sends its current state vector to request missing updates. |
+| `yjs-sync-step2` | Server $\rightarrow$ Client | `{ update }` | Server sends the missing diff update to complete synchronization. |
 | `language-change` | Bi-directional | `{ roomId, language }` | Synchronizes selected programming language across all peer editors. |
-| `sync-code` | Client $\leftrightarrow$ Server | `{ socketId, code, language }` | Syncs existing state from active peers directly to the newcomer's socket ID. |
 | `disconnected` | Server $\rightarrow$ Room | `{ socketId, username }` | Broadcasts departure and removes user from the active roster. |
 
 ---

@@ -2,6 +2,7 @@ const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
+const Y = require("yjs");
 const ACTIONS = require("./src/Actions");
 
 const app = express();
@@ -18,8 +19,42 @@ const io = new Server(server, {
 // Map of socket.id -> { username, roomId }
 const userSocketMap = {};
 
-// In-memory room state: roomId -> { code: string, language: string }
+// Per-room metadata: roomId -> { language: string }
 const roomDataMap = {};
+
+// Per-room Yjs document: roomId -> Y.Doc
+const roomYDocs = {};
+
+const DEFAULT_CODE = `/**
+ * ========================================================
+ *  Welcome to CodeShare
+ *  Real-Time Collaborative Code Editor
+ * ========================================================
+ * 
+ *  Features:
+ *    • Live multi-user peer synchronization (Yjs CRDT)
+ *    • Real-time language & syntax switching
+ *    • Instant room sharing & presence indicators
+ * 
+ *  Copy your Room ID from the sidebar to collaborate!
+ */
+
+function welcome() {
+  console.log("Ready to code together in real-time!");
+}
+
+welcome();
+`;
+
+/** Return or create the shared Y.Doc for a room */
+function getRoomDoc(roomId) {
+  if (!roomYDocs[roomId]) {
+    const ydoc = new Y.Doc();
+    ydoc.getText("monaco").insert(0, DEFAULT_CODE);
+    roomYDocs[roomId] = ydoc;
+  }
+  return roomYDocs[roomId];
+}
 
 function getAllConnectedClients(roomId) {
   return Array.from(io.sockets.adapter.rooms.get(roomId) || []).map(
@@ -31,21 +66,24 @@ function getAllConnectedClients(roomId) {
 }
 
 io.on("connection", (socket) => {
-  // User joins a room
+  // ── JOIN: client enters a room ──────────────────────────────────────────
   socket.on(ACTIONS.JOIN, ({ roomId, username }) => {
     userSocketMap[socket.id] = { username, roomId };
     socket.join(roomId);
 
-    // If the room already has stored state, immediately send to the new user
-    if (roomDataMap[roomId]) {
-      if (roomDataMap[roomId].code !== undefined && roomDataMap[roomId].code !== null) {
-        socket.emit(ACTIONS.CODE_CHANGE, { code: roomDataMap[roomId].code });
-      }
-      if (roomDataMap[roomId].language) {
-        socket.emit(ACTIONS.LANGUAGE_CHANGE, { language: roomDataMap[roomId].language });
-      }
+    // Send the current Yjs document state to the newcomer
+    const ydoc = getRoomDoc(roomId);
+    const fullUpdate = Y.encodeStateAsUpdate(ydoc);
+    socket.emit(ACTIONS.YJS_SYNC_STEP2, { update: Array.from(fullUpdate) });
+
+    // Send current language if already set
+    if (roomDataMap[roomId]?.language) {
+      socket.emit(ACTIONS.LANGUAGE_CHANGE, {
+        language: roomDataMap[roomId].language,
+      });
     }
 
+    // Broadcast updated presence list
     const clients = getAllConnectedClients(roomId);
     clients.forEach(({ socketId }) => {
       io.to(socketId).emit(ACTIONS.JOINED, {
@@ -56,44 +94,45 @@ io.on("connection", (socket) => {
     });
   });
 
-  // Relay and persist code changes
-  socket.on(ACTIONS.CODE_CHANGE, ({ roomId, code }) => {
+  // ── Yjs: receive document update from client ─────────────────────────────
+  socket.on(ACTIONS.YJS_UPDATE, ({ roomId, update }) => {
     const targetRoomId = roomId || userSocketMap[socket.id]?.roomId;
-    if (targetRoomId) {
-      if (!roomDataMap[targetRoomId]) roomDataMap[targetRoomId] = {};
-      roomDataMap[targetRoomId].code = code;
-      socket.to(targetRoomId).emit(ACTIONS.CODE_CHANGE, { code });
+    if (!targetRoomId || !update) return;
+
+    const ydoc = getRoomDoc(targetRoomId);
+    try {
+      Y.applyUpdate(ydoc, new Uint8Array(update));
+    } catch (err) {
+      console.error("Error applying Yjs update on server:", err);
+      return;
     }
+
+    // Broadcast the update to all other peers in the room
+    socket.to(targetRoomId).emit(ACTIONS.YJS_UPDATE, { update });
   });
 
-  // Relay and persist language changes
+  // ── Yjs: step-1 sync request (state vector) ──────────────────────────────
+  socket.on(ACTIONS.YJS_SYNC_STEP1, ({ roomId, stateVector }) => {
+    const targetRoomId = roomId || userSocketMap[socket.id]?.roomId;
+    if (!targetRoomId || !stateVector) return;
+
+    const ydoc = getRoomDoc(targetRoomId);
+    const diff = Y.encodeStateAsUpdate(ydoc, new Uint8Array(stateVector));
+    socket.emit(ACTIONS.YJS_SYNC_STEP2, { update: Array.from(diff) });
+  });
+
+  // ── Language change ───────────────────────────────────────────────────────
   socket.on(ACTIONS.LANGUAGE_CHANGE, ({ roomId, language }) => {
     const targetRoomId = roomId || userSocketMap[socket.id]?.roomId;
-    if (targetRoomId) {
-      if (!roomDataMap[targetRoomId]) roomDataMap[targetRoomId] = {};
-      roomDataMap[targetRoomId].language = language;
-      socket.to(targetRoomId).emit(ACTIONS.LANGUAGE_CHANGE, { language });
-    }
+    if (!targetRoomId) return;
+
+    if (!roomDataMap[targetRoomId]) roomDataMap[targetRoomId] = {};
+    roomDataMap[targetRoomId].language = language;
+
+    socket.to(targetRoomId).emit(ACTIONS.LANGUAGE_CHANGE, { language });
   });
 
-  // Peer-to-peer fallback sync
-  socket.on(ACTIONS.SYNC_CODE, ({ socketId, code, language }) => {
-    const targetRoomId = userSocketMap[socket.id]?.roomId;
-    if (targetRoomId) {
-      if (!roomDataMap[targetRoomId]) roomDataMap[targetRoomId] = {};
-      if (code !== undefined && code !== null) roomDataMap[targetRoomId].code = code;
-      if (language) roomDataMap[targetRoomId].language = language;
-    }
-
-    if (code !== undefined && code !== null) {
-      io.to(socketId).emit(ACTIONS.CODE_CHANGE, { code });
-    }
-    if (language) {
-      io.to(socketId).emit(ACTIONS.LANGUAGE_CHANGE, { language });
-    }
-  });
-
-  // Handle client disconnecting
+  // ── Disconnect ────────────────────────────────────────────────────────────
   socket.on("disconnecting", () => {
     const rooms = [...socket.rooms];
     rooms.forEach((roomId) => {
@@ -102,7 +141,6 @@ io.on("connection", (socket) => {
         username: userSocketMap[socket.id]?.username,
       });
     });
-
     delete userSocketMap[socket.id];
   });
 });

@@ -29,7 +29,6 @@ const LANGUAGES = [
 
 const EditorPage = () => {
   const socketRef = useRef(null);
-  const codeRef = useRef(null);
   const languageRef = useRef("javascript");
   const { roomId } = useParams();
   const location = useLocation();
@@ -72,16 +71,13 @@ const EditorPage = () => {
         s.on("connect_error", handleErrors);
         s.on("connect_failed", handleErrors);
 
-        // Join the room
-        s.emit(ACTIONS.JOIN, {
-          roomId,
-          username,
-        });
+        // Join the room — server will send the full Yjs doc state + language
+        s.emit(ACTIONS.JOIN, { roomId, username });
 
-        // Listen for new clients joining
+        // Listen for clients joining (presence only; code sync is via Yjs)
         s.on(
           ACTIONS.JOINED,
-          ({ clients: roomClients, username: joinedUser, socketId }) => {
+          ({ clients: roomClients, username: joinedUser }) => {
             if (!isMounted) return;
 
             if (joinedUser !== username) {
@@ -89,13 +85,7 @@ const EditorPage = () => {
             }
 
             setClients(roomClients);
-
-            // Sync current editor code & language to the newcomer
-            s.emit(ACTIONS.SYNC_CODE, {
-              code: codeRef.current,
-              language: languageRef.current,
-              socketId,
-            });
+            // No SYNC_CODE needed — Yjs handles all document synchronization
           }
         );
 
@@ -158,10 +148,7 @@ const EditorPage = () => {
 
     const s = socketRef.current || socket;
     if (s) {
-      s.emit(ACTIONS.LANGUAGE_CHANGE, {
-        roomId,
-        language: newLang,
-      });
+      s.emit(ACTIONS.LANGUAGE_CHANGE, { roomId, language: newLang });
     }
   };
 
@@ -266,9 +253,6 @@ const EditorPage = () => {
           socket={socket}
           roomId={roomId}
           language={language}
-          onCodeChange={(code) => {
-            codeRef.current = code;
-          }}
         />
       </main>
     </div>
